@@ -61,6 +61,7 @@ const ProductsPage = () => {
     // STATES LƯU TRỮ DỮ LIỆU
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [addingToCart, setAddingToCart] = useState(null); // THÊM MỚI: State loading cho nút Mua
 
     // STATES CHO BỘ LỌC (FILTERS)
     const urlCategory = location.pathname.split('/')[2]; 
@@ -95,6 +96,41 @@ const ProductsPage = () => {
             setSelectedBrands([]); 
         }
     }, [urlCategory]);
+
+    // ================= THÊM MỚI: HÀM XỬ LÝ MUA HÀNG BẢO MẬT =================
+    const handleAddToCart = async (e, product) => {
+        e.stopPropagation(); // Chặn sự kiện click thẻ Card (để không bị nhảy sang trang Detail)
+        
+        const token = localStorage.getItem('token');
+
+        // Kiểm tra khách vãng lai
+        if (!token) {
+            message.warning('Vui lòng đăng nhập để bắt đầu mua sắm!');
+            navigate('/login');
+            return;
+        }
+
+        // Nếu là User, tiến hành gọi API lưu giỏ hàng
+        setAddingToCart(product._id);
+        try {
+            const defaultVariant = product.variants?.[0]; // Lấy biến thể đầu tiên làm mặc định
+            
+            await api.post('/cart/add', {
+                productId: product._id,
+                variantId: defaultVariant?._id,
+                quantity: 1
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            message.success(`Đã thêm ${product.name} vào giỏ hàng!`);
+            window.dispatchEvent(new Event('CART_UPDATED'));
+        } catch (error) {
+            message.error(error.response?.data?.message || 'Lỗi khi thêm vào giỏ hàng');
+        } finally {
+            setAddingToCart(null);
+        }
+    };
 
     // 2. LOGIC LỌC SẢN PHẨM (FILTER ENGINE)
     const filteredProducts = useMemo(() => {
@@ -148,14 +184,33 @@ const ProductsPage = () => {
                     let isMatch = false;
                     const keyLower = normalizeString(specKey);
                     
+                    // Hàm kiểm tra chuyên biệt cho RAM/ROM (Tránh lỗi 128GB match 8GB)
+                    const isMemoryMatch = (dbMem, filterMem) => {
+                        if (!dbMem || !filterMem) return false;
+                        const s1 = dbMem.toString().toLowerCase().trim();
+                        const s2 = filterMem.toString().toLowerCase().trim();
+                        if (s1 === s2) return true;
+                        
+                        // Cắt chuỗi theo các dấu phân cách phổ biến (dấu cách, gạch ngang, slash, dấu phẩy...)
+                        const tokens = s1.split(/[\s/\-+,_]+/);
+                        return tokens.some(token => token === s2);
+                    };
+
                     // Nếu khách lọc ROM/Storage
                     if (keyLower === normalizeString('ROM') || keyLower === normalizeString('Storage') || keyLower === normalizeString('Dung lượng')) {
-                        isMatch = allowedValues.some(val => isFuzzyMatch(v.storage, val));
+                        isMatch = allowedValues.some(val => isMemoryMatch(v.storage, val));
                     }
-                    // Nếu khách lọc RAM (phòng trường hợp biến thể có lưu RAM)
+                    
+                    // Nếu khách lọc RAM
                     if (keyLower === normalizeString('RAM')) {
-                        isMatch = allowedValues.some(val => isFuzzyMatch(v.ram, val));
+                        isMatch = allowedValues.some(val => {
+                            if (isMemoryMatch(v.ram, val)) return true;
+                            // Nhiều trường hợp admin lưu gộp RAM và ROM chung 1 phân loại "8GB-128GB" nên ta quét luôn v.storage
+                            if (isMemoryMatch(v.storage, val)) return true;
+                            return false;
+                        });
                     }
+                    
                     return isMatch;
                 });
 
@@ -391,7 +446,14 @@ const ProductsPage = () => {
                                                     </Text>
                                                 )}
                                             </div>
-                                            <Button type="primary" shape="round" icon={<ShoppingCartOutlined />} onClick={(e) => { e.stopPropagation(); message.success('Đã thêm vào giỏ!'); }}>
+                                            {/* THÊM MỚI: Tích hợp hàm handleAddToCart và loading state */}
+                                            <Button 
+                                                type="primary" 
+                                                shape="round" 
+                                                icon={<ShoppingCartOutlined />} 
+                                                loading={addingToCart === product._id}
+                                                onClick={(e) => handleAddToCart(e, product)}
+                                            >
                                                 Mua
                                             </Button>
                                         </div>

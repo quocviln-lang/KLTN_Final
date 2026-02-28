@@ -10,7 +10,10 @@ import {
   BellOutlined, 
   MessageOutlined, 
   SafetyOutlined,
-  GiftOutlined // <-- PHẢI CÓ DÒNG NÀY Ở ĐÂY
+  GiftOutlined,
+  UserOutlined,
+  FileTextOutlined,
+  MailOutlined
 } from '@ant-design/icons';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 
@@ -45,8 +48,28 @@ const AdminLayout = () => {
     }, 
     { 
       key: '/admin/promotions', 
-      icon: <GiftOutlined />, // Icon gây ra lỗi nếu không được import
+      icon: <GiftOutlined />, 
       label: <Link to="/admin/promotions">Promotions</Link> 
+    },
+    { 
+      key: '/admin/orders', 
+      icon: <FileTextOutlined />, 
+      label: <Link to="/admin/orders">Orders</Link> 
+    },
+    { 
+      key: '/admin/users', 
+      icon: <UserOutlined />, 
+      label: <Link to="/admin/users">Users</Link> 
+    },
+    { 
+      key: '/admin/feedbacks', 
+      icon: <MailOutlined />, 
+      label: <Link to="/admin/feedbacks">Hộp thư Phản hồi</Link> 
+    },
+    { 
+      key: '/admin/news', 
+      icon: <FileTextOutlined />, 
+      label: <Link to="/admin/news">Tin tức</Link> 
     },
     { 
       key: 'logout', 

@@ -28,6 +28,10 @@ const ProductDetailPage = () => {
     const [selectedColor, setSelectedColor] = useState('');
     const [selectedStorage, setSelectedStorage] = useState('');
 
+    // States quản lý hiệu ứng Loading khi mua hàng
+    const [isAddingToCart, setIsAddingToCart] = useState(false);
+    const [isBuyingNow, setIsBuyingNow] = useState(false);
+
     // ================= STATES: ĐÁNH GIÁ (REVIEWS) =================
     const [reviews, setReviews] = useState([]);
     const [reviewRating, setReviewRating] = useState(5);
@@ -49,7 +53,6 @@ const ProductDetailPage = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // API lúc này đã trả về kèm activePromotion và salePrice
                 const prodRes = await api.get('/products');
                 const allProducts = prodRes.data.data;
                 const foundProduct = allProducts.find(p => p.slug === slug);
@@ -102,16 +105,14 @@ const ProductDetailPage = () => {
         if (variantWithColor) setMainImage(variantWithColor.image);
     };
 
-    // ================= LOGIC TÍNH GIÁ ĐỘNG (Dựa trên biến thể và khuyến mãi) =================
+    // ================= LOGIC TÍNH GIÁ ĐỘNG =================
     const { originalPrice, finalPrice, hasDiscount } = useMemo(() => {
         if (!product) return { originalPrice: 0, finalPrice: 0, hasDiscount: false };
         
-        // Giá gốc lấy từ biến thể đang chọn, nếu không có thì lấy giá base của sản phẩm
         const origPrice = currentVariant?.price || product.basePrice || 0;
         let finPrice = origPrice;
         let isDiscounted = false;
 
-        // Nếu sản phẩm đang nằm trong chiến dịch Khuyến mãi
         if (product.activePromotion) {
             isDiscounted = true;
             if (product.activePromotion.discountPercent > 0) {
@@ -220,35 +221,52 @@ const ProductDetailPage = () => {
         }
     };
 
-    // ================= LOGIC MUA HÀNG (GIỎ HÀNG & MUA NGAY) =================
+    // ================= LOGIC MUA HÀNG (ĐÃ GẮN SỰ KIỆN CART_UPDATED) =================
     const handleAction = async (isBuyNow = false) => {
         if (!currentUser) {
             message.warning('Vui lòng đăng nhập để thực hiện!');
             return navigate('/login');
         }
 
-        const payload = {
+        const checkoutPayload = {
             productId: product._id,
             variantId: currentVariant?._id,
             name: product.name,
             image: mainImage,
             color: selectedColor,
             storage: selectedStorage,
-            price: finalPrice, // ĐÃ ĐỔI: Dùng giá finalPrice (giá đã giảm) để lưu vào giỏ
+            price: finalPrice, 
+            quantity: 1
+        };
+
+        const apiPayload = {
+            productId: product._id,
+            variantId: currentVariant?._id,
             quantity: 1
         };
 
         if (isBuyNow) {
-            navigate('/checkout', { state: { buyNowItem: payload } });
+            setIsBuyingNow(true);
+            setTimeout(() => {
+                navigate('/checkout', { state: { buyNowItem: checkoutPayload } });
+                setIsBuyingNow(false);
+            }, 500);
         } else {
+            setIsAddingToCart(true);
             try {
-                await api.post('/cart/add', payload, {
+                await api.post('/cart/add', apiPayload, {
                     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 message.success('Đã thêm sản phẩm vào giỏ hàng!');
+                
+                // THÊM MỚI: Bắn tín hiệu để thanh Header cập nhật lại số lượng ngay lập tức
+                window.dispatchEvent(new Event('CART_UPDATED'));
+                
             } catch (error) {
                 console.error('Error adding to cart:', error);
-                message.error('Thêm vào giỏ hàng thất bại!');
+                message.error(error.response?.data?.message || 'Thêm vào giỏ hàng thất bại!');
+            } finally {
+                setIsAddingToCart(false);
             }
         }
     };
@@ -412,7 +430,6 @@ const ProductDetailPage = () => {
                         <Title level={2} style={{ color: '#fff', margin: '0 0 16px 0' }}>{product.name}</Title>
                         <Space style={{ marginBottom: '24px' }}><Rate disabled allowHalf value={parseFloat(avgRating)} style={{ color: '#faad14', fontSize: '16px' }} /><Text style={{ color: '#8b949e' }}>{avgRating} ({reviews.length} đánh giá)</Text></Space>
                         
-                        {/* KHU VỰC HIỂN THỊ GIÁ CẢ ĐÃ ĐƯỢC NÂNG CẤP */}
                         <div style={{ marginBottom: '24px' }}>
                             {hasDiscount ? (
                                 <Space align="baseline" size="middle">
@@ -444,12 +461,12 @@ const ProductDetailPage = () => {
                             <div style={{ marginBottom: '32px' }}><Text strong style={{ color: '#fff', display: 'block', marginBottom: '12px', textTransform: 'uppercase', fontSize: '12px', letterSpacing: '1px' }}>Màu sắc</Text><Space wrap>{availableColors.map(color => (<button key={color} className={`variant-btn ${selectedColor === color ? 'active' : ''}`} onClick={() => handleColorSelect(color)}>{color}</button>))}</Space></div>
                         )}
                         
-                        {/* NHÓM NÚT HÀNH ĐỘNG */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                             <Button 
                                 type="primary" 
                                 size="large" 
                                 icon={<ThunderboltOutlined />} 
+                                loading={isBuyingNow} 
                                 style={{ height: '56px', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', flex: 1, background: '#2162ed' }} 
                                 disabled={currentVariant?.quantity === 0} 
                                 onClick={() => handleAction(true)}
@@ -460,6 +477,7 @@ const ProductDetailPage = () => {
                                 ghost 
                                 size="large" 
                                 icon={<ShoppingCartOutlined />} 
+                                loading={isAddingToCart} 
                                 style={{ height: '56px', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', flex: 1, color: '#2162ed', borderColor: '#2162ed' }} 
                                 disabled={currentVariant?.quantity === 0} 
                                 onClick={() => handleAction(false)}
@@ -483,7 +501,6 @@ const ProductDetailPage = () => {
                 </Space>
             </Modal>
 
-            {/* PHẦN GỢI Ý: CÓ LẼ BẠN CŨNG THÍCH */}
             {relatedProducts.length > 0 && (
                 <div>
                     <Title level={3} style={{ color: '#fff', marginBottom: '24px' }}>Có thể bạn sẽ thích</Title>
@@ -508,7 +525,6 @@ const ProductDetailPage = () => {
                                         <Text type="secondary" style={{ fontSize: '12px' }}>{p.variants?.[0]?.storage ? `${p.variants[0].storage} - ` : ''} {p.variants?.[0]?.color || p.brand}</Text>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '20px' }}>
                                             
-                                            {/* HIỂN THỊ GIÁ SẢN PHẨM GỢI Ý */}
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                 {hasRelDiscount ? (
                                                     <>

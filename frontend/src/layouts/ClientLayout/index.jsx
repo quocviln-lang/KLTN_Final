@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, Input, Badge, Avatar, Dropdown, Space, Typography, Row, Col, Divider } from 'antd';
 import { 
     ShoppingCartOutlined, 
@@ -9,7 +9,8 @@ import {
     ThunderboltOutlined,
     SafetyOutlined
 } from '@ant-design/icons';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import api from '../../services/api'; 
 
 const { Header, Content, Footer } = Layout;
 const { Search } = Input;
@@ -17,14 +18,47 @@ const { Text, Title } = Typography;
 
 const ClientLayout = () => {
     const navigate = useNavigate();
+    const location = useLocation(); 
+    const [cartItemCount, setCartItemCount] = useState(0); 
 
-    // Menu con cho phần "Danh mục"
     const categoryItems = [
         { key: 'phones', icon: <MobileOutlined />, label: <Link to="/category/phones">Điện thoại</Link> },
         { key: 'audio', icon: <CustomerServiceOutlined />, label: <Link to="/category/audio">Tai nghe</Link> },
         { key: 'chargers', icon: <ThunderboltOutlined />, label: <Link to="/category/chargers">Sạc & Cáp</Link> },
         { key: 'cases', icon: <SafetyOutlined />, label: <Link to="/category/cases">Ốp lưng</Link> },
     ];
+
+    // ================= LOGIC LẮNG NGHE SỰ KIỆN GIỎ HÀNG (EVENT LISTENER) =================
+    useEffect(() => {
+        const fetchCartCount = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setCartItemCount(0);
+                return;
+            }
+            try {
+                const res = await api.get('/cart', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const items = res.data.data?.items || [];
+                const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
+                setCartItemCount(totalCount);
+            } catch (error) {
+                console.error('Lỗi lấy thông tin giỏ hàng trên Header:', error);
+            }
+        };
+
+        // 1. Chạy 1 lần khi load trang hoặc người dùng đổi URL
+        fetchCartCount();
+
+        // 2. Bật "ăng-ten" lắng nghe tín hiệu CART_UPDATED từ các trang khác bắn sang
+        window.addEventListener('CART_UPDATED', fetchCartCount);
+
+        // 3. Tắt "ăng-ten" khi component bị hủy (Tránh rò rỉ bộ nhớ - Clean Code chuẩn mực)
+        return () => {
+            window.removeEventListener('CART_UPDATED', fetchCartCount);
+        };
+    }, [location.pathname]);
 
     return (
         <Layout style={{ minHeight: '100vh', background: '#0d1117' }}>
@@ -33,7 +67,7 @@ const ClientLayout = () => {
                 position: 'sticky', 
                 top: 0, 
                 zIndex: 999, 
-                background: '#101622', // Màu nền Dark Navy
+                background: '#101622', 
                 padding: '0 50px',
                 display: 'flex',
                 alignItems: 'center',
@@ -41,7 +75,7 @@ const ClientLayout = () => {
                 borderBottom: '1px solid #1f2937',
                 height: '80px'
             }}>
-                {/* 1. Logo & Tên Web */}
+                {/* Logo & Tên Web */}
                 <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate('/')}>
                     <div style={{ 
                         width: '40px', height: '40px', background: '#2162ed', 
@@ -53,7 +87,7 @@ const ClientLayout = () => {
                     <Title level={3} style={{ color: '#fff', margin: 0, letterSpacing: '1px' }}>TechNova</Title>
                 </div>
 
-                {/* 2. Thanh Tìm Kiếm */}
+                {/* Thanh Tìm Kiếm */}
                 <div style={{ flex: 1, maxWidth: '400px', margin: '0 40px' }}>
                     <Search 
                         placeholder="Bạn tìm gì hôm nay?" 
@@ -61,41 +95,53 @@ const ClientLayout = () => {
                         enterButton 
                         size="large"
                         style={{ width: '100%' }}
-                        // Đè CSS một chút để hợp với Dark Mode
                         className="dark-search-bar"
                     />
                 </div>
 
-                {/* 3. Navigation Links */}
+                {/* Navigation Links */}
                 <Space size="large" style={{ fontSize: '16px', fontWeight: '500' }}>
                     <Dropdown menu={{ items: categoryItems }} placement="bottomLeft">
                         <span style={{ color: '#e6edf3', cursor: 'pointer' }}>
                             Danh mục <DownOutlined style={{ fontSize: '12px' }} />
                         </span>
                     </Dropdown>
-                    <Link to="/promotions" style={{ color: '#e6edf3' }}>Khuyến mãi</Link>
-                    <Link to="/news" style={{ color: '#e6edf3' }}>Tin tức</Link>
-                    <Link to="/contact" style={{ color: '#e6edf3' }}>Liên hệ</Link>
+                    <Link to="/products" style={{ color: '#fff', fontSize: '16px', fontWeight: '500' }}>Sản phẩm</Link>
+                    <Link to="/promotions" style={{ color: '#fff', fontSize: '16px', fontWeight: '500' }}>Khuyến mãi</Link>
+                    <Link to="/news" style={{ color: '#fff', fontSize: '16px', fontWeight: '500' }}>Tin tức</Link>
+                    <Link to="/support" style={{ color: '#fff', fontSize: '16px', fontWeight: '500' }}>Hỗ trợ</Link>
                 </Space>
 
-                {/* 4. Giỏ hàng & User */}
+                {/* Giỏ hàng & User */}
                 <Space size="large" style={{ marginLeft: '40px' }}>
-                    <Badge count={2} size="small" color="#f5222d">
+                    {/* Badge đã được gắn state động, sẽ nhảy số ngay lập tức! */}
+                    <Badge count={cartItemCount} size="small" color="#f5222d">
                         <ShoppingCartOutlined 
                             style={{ fontSize: '24px', color: '#fff', cursor: 'pointer' }} 
                             onClick={() => navigate('/cart')}
                         />
                     </Badge>
-                    <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => navigate('/login')}>
-                        <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#2162ed' }} />
-                        <Text style={{ color: '#fff', display: { xs: 'none', md: 'block' } }}>Tài khoản</Text>
+                    <div 
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} 
+                        onClick={() => {
+                            const token = localStorage.getItem('token');
+                            navigate(token ? '/profile' : '/login');
+                        }}
+                    >
+                        <Avatar 
+                            icon={<UserOutlined />} 
+                            src={JSON.parse(localStorage.getItem('user'))?.avatar}
+                            style={{ backgroundColor: '#2162ed' }} 
+                        />
+                        <Text style={{ color: '#fff', display: { xs: 'none', md: 'block' } }}>
+                            {JSON.parse(localStorage.getItem('user'))?.name || 'Tài khoản'}
+                        </Text>
                     </div>
                 </Space>
             </Header>
 
-            {/* ================= CONTENT (Nơi chứa HomePage) ================= */}
+            {/* ================= CONTENT ================= */}
             <Content style={{ padding: '0 50px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
-                {/* Thành phần <Outlet /> này sẽ tự động nạp nội dung của HomePage vào giữa */}
                 <Outlet /> 
             </Content>
 

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Typography, Input, Button, Space, Divider, message, Badge } from 'antd';
-import { TagOutlined, LockOutlined } from '@ant-design/icons';
+import { TagOutlined, LockOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import api from '../../services/api';
 
 const { Text, Title } = Typography;
 
-const OrderSummary = ({ cartItems, subtotal, shippingFee, discount, setDiscount }) => {
+const OrderSummary = ({ cartItems = [], subtotal = 0, shippingFee = 0, discount, setDiscount, isCartPage = false, onCheckout }) => {
     const [promoCode, setPromoCode] = useState('');
     const [loadingPromo, setLoadingPromo] = useState(false);
 
@@ -35,24 +35,27 @@ const OrderSummary = ({ cartItems, subtotal, shippingFee, discount, setDiscount 
         <div style={{ background: '#161e2e', padding: '32px', borderRadius: '16px', border: '1px solid #30363d' }}>
             <Title level={4} style={{ color: '#fff', margin: '0 0 24px 0' }}>Tóm tắt đơn hàng</Title>
             
-            <div style={{ maxHeight: '300px', overflowY: 'auto', paddingRight: '8px', marginBottom: '24px' }}>
-                {cartItems.map((item, index) => (
-                    <div key={index} style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
-                        <Badge count={item.quantity} color="#2162ed">
-                            <div style={{ width: '64px', height: '64px', background: '#0d1117', borderRadius: '8px', border: '1px solid #30363d', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                <img src={item.image || 'https://via.placeholder.com/64'} alt={item.name} style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }} />
+            {/* ẨN DANH SÁCH SẢN PHẨM NẾU ĐANG Ở TRANG GIỎ HÀNG (CART PAGE) */}
+            {!isCartPage && cartItems && cartItems.length > 0 && (
+                <div style={{ maxHeight: '300px', overflowY: 'auto', paddingRight: '8px', marginBottom: '24px' }}>
+                    {cartItems.map((item, index) => (
+                        <div key={index} style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                            <Badge count={item.quantity} color="#2162ed">
+                                <div style={{ width: '64px', height: '64px', background: '#0d1117', borderRadius: '8px', border: '1px solid #30363d', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                    <img src={item.image || 'https://via.placeholder.com/64'} alt={item.name} style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }} />
+                                </div>
+                            </Badge>
+                            <div style={{ flex: 1 }}>
+                                <Text strong style={{ color: '#e6edf3', display: 'block' }}>{item.name}</Text>
+                                <Text type="secondary" style={{ fontSize: '12px' }}>{item.storage ? `${item.storage} / ` : ''}{item.color}</Text>
                             </div>
-                        </Badge>
-                        <div style={{ flex: 1 }}>
-                            <Text strong style={{ color: '#e6edf3', display: 'block' }}>{item.name}</Text>
-                            <Text type="secondary" style={{ fontSize: '12px' }}>{item.storage ? `${item.storage} / ` : ''}{item.color}</Text>
+                            <Text strong style={{ color: '#fff' }}>{(item.price * item.quantity).toLocaleString('vi-VN')} đ</Text>
                         </div>
-                        <Text strong style={{ color: '#fff' }}>{(item.price * item.quantity).toLocaleString('vi-VN')} đ</Text>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
-            <Divider style={{ borderColor: '#30363d', margin: '16px 0' }} />
+            {!isCartPage && <Divider style={{ borderColor: '#30363d', margin: '16px 0' }} />}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <Text style={{ color: '#8b949e' }}>Tạm tính</Text>
@@ -98,6 +101,20 @@ const OrderSummary = ({ cartItems, subtotal, shippingFee, discount, setDiscount 
                     ÁP DỤNG
                 </Button>
             </Space.Compact>
+
+            {/* NÚT TIẾN HÀNH THANH TOÁN (CHỈ HIỂN THỊ Ở CART PAGE) */}
+            {isCartPage && (
+                <Button 
+                    type="primary" 
+                    size="large" 
+                    block 
+                    onClick={onCheckout}
+                    disabled={cartItems.length === 0}
+                    style={{ background: '#2162ed', border: 'none', fontWeight: 'bold', height: '48px', borderRadius: '24px', marginBottom: '16px', fontSize: '16px' }}
+                >
+                    Tiến hành Thanh toán <ArrowRightOutlined />
+                </Button>
+            )}
 
             <div style={{ textAlign: 'center' }}>
                 <Text style={{ color: '#8b949e', fontSize: '12px' }}><LockOutlined /> Giao dịch được mã hóa SSL an toàn</Text>

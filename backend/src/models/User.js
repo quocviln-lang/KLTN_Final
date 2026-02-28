@@ -38,6 +38,7 @@ const userSchema = new mongoose.Schema({
         accountNumber: String,
         isDefault: { type: Boolean, default: false }
     }],
+    spinCount: { type: Number, default: 1 }, // Số lượt quay Game
     isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

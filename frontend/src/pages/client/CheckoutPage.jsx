@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Row, Col, Typography, Steps, Button, message, Form } from 'antd';
+import { Row, Col, Typography, Steps, Button, message, Form, Spin } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import OrderSummary from '../../components/checkout/OrderSummary';
 import ShippingStep from '../../components/checkout/ShippingStep';
 import PaymentStep from '../../components/checkout/PaymentStep';
 import ReviewStep from '../../components/checkout/ReviewStep';
+import api from '../../services/api'; // <-- Thêm import API
 
 const { Title, Text } = Typography;
 
@@ -15,34 +16,67 @@ const CheckoutPage = () => {
     
     const [currentStep, setCurrentStep] = useState(0); 
     const [cartItems, setCartItems] = useState([]);
+    const [loadingCart, setLoadingCart] = useState(true); // <-- Thêm state loading để chờ fetch data
     
     const [form] = Form.useForm();
     const [shippingDetails, setShippingDetails] = useState({});
-    const [paymentMethod, setPaymentMethod] = useState('cod'); // Chuyển COD làm mặc định
+    const [paymentMethod, setPaymentMethod] = useState('cod');
     
     const [selectedServices, setSelectedServices] = useState([]);
     const [discount, setDiscount] = useState(null);
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
+    // ================= LOGIC LẤY DỮ LIỆU GIỎ HÀNG THÔNG MINH =================
     useEffect(() => {
-        if (location.state?.buyNowItem) {
-            setCartItems([location.state?.buyNowItem]);
-        } else {
-            const savedCart = JSON.parse(localStorage.getItem('cart') || '[]');
-            if (savedCart.length > 0) {
-                setCartItems(savedCart);
-            } else {
-                message.warning('Giỏ hàng trống!');
-                navigate('/products');
+        const fetchCheckoutData = async () => {
+            // 1. Trường hợp bấm "Mua Ngay" từ trang chi tiết
+            if (location.state?.buyNowItem) {
+                setCartItems([location.state.buyNowItem]);
+                setLoadingCart(false);
+                return;
             }
-        }
+            
+            // 2. Trường hợp đi từ CartPage sang (đã truyền sẵn data qua state)
+            if (location.state?.fromCart && location.state?.cartItems) {
+                if (location.state.cartItems.length > 0) {
+                    setCartItems(location.state.cartItems);
+                } else {
+                    message.warning('Giỏ hàng của bạn đang trống!');
+                    navigate('/cart');
+                }
+                setLoadingCart(false);
+                return;
+            }
+
+            // 3. Trường hợp F5 lại trang Checkout hoặc vào trực tiếp link -> Fetch từ API Backend
+            try {
+                const res = await api.get('/cart', {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                const items = res.data.data?.items || [];
+                
+                if (items.length > 0) {
+                    setCartItems(items);
+                } else {
+                    message.warning('Giỏ hàng của bạn đang trống!');
+                    navigate('/cart');
+                }
+            } catch (error) {
+                console.error("Lỗi lấy giỏ hàng:", error);
+                message.error('Không thể tải thông tin đơn hàng!');
+                navigate('/cart');
+            } finally {
+                setLoadingCart(false);
+            }
+        };
+
+        fetchCheckoutData();
     }, [location, navigate]);
 
     const productSubtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const servicesTotal = selectedServices.reduce((sum, s) => sum + s.price, 0);
     const finalSubtotal = productSubtotal + servicesTotal;
     
-    // Đổi phí ship sang VNĐ
     const shippingFee = currentStep === 0 ? 0 : 30000; 
 
     const handleNext = async () => {
@@ -75,28 +109,64 @@ const CheckoutPage = () => {
     const handlePlaceOrder = async () => {
         setIsPlacingOrder(true);
         try {
+            const token = localStorage.getItem('token');
+            const totalToPay = finalSubtotal + shippingFee + (finalSubtotal * 0.08) - (discount?.discountAmount || 0);
+            
             const orderPayload = {
-                items: cartItems,
+                items: cartItems.map(item => ({
+                    productId: item.productId,
+                    variantId: item.variantId,
+                    name: item.name,
+                    color: item.color,
+                    storage: item.storage,
+                    quantity: item.quantity,
+                    price: item.price,
+                    image: item.image
+                })),
                 shippingInfo: shippingDetails,
                 paymentMethod: paymentMethod,
                 services: selectedServices,
                 discountCode: discount?.code,
-                totalAmount: finalSubtotal + shippingFee + (finalSubtotal * 0.08) - (discount?.discountAmount || 0)
+                totalAmount: totalToPay
             };
 
-            console.log("Dữ liệu gửi lên Server:", orderPayload);
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Gọi API thật lên BE
+            const response = await api.post('/orders', orderPayload, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
 
             message.success('Đặt hàng thành công! Cảm ơn bạn.');
-            localStorage.removeItem('cart');
-            navigate('/'); 
+            
+            // Xóa rỗng Redux / Event báo hiệu reset Cart ở thanh điều hướng nếu có
+            window.dispatchEvent(new Event('CART_UPDATED'));
+
+            // Truyền cục data đã lưu thành công ở BE sang trang Success để hiển thị
+            const savedOrder = response.data.data;
+            navigate('/checkout/success', { 
+                state: { 
+                    orderData: {
+                        orderId: savedOrder.orderCode,
+                        createdAt: savedOrder.createdAt,
+                        paymentMethod: savedOrder.paymentMethod,
+                        shippingAddress: `${savedOrder.shippingAddress}, ${savedOrder.province}`,
+                        items: savedOrder.items,
+                        totalPaid: savedOrder.total
+                    } 
+                }
+            }); 
+            
         } catch (error) {
             console.error("Error placing order:", error);
-            message.error('Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại!');
+            message.error(error.response?.data?.message || 'Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại!');
         } finally {
             setIsPlacingOrder(false);
         }
     };
+
+    // Hiển thị vòng xoay nếu đang tải dữ liệu giỏ hàng để tránh lỗi giao diện
+    if (loadingCart) {
+        return <div style={{ textAlign: 'center', padding: '100px', height: '100vh' }}><Spin size="large" /></div>;
+    }
 
     return (
         <div style={{ padding: '40px 0', color: '#e6edf3', maxWidth: '1200px', margin: '0 auto' }}>
@@ -155,6 +225,7 @@ const CheckoutPage = () => {
                 </Col>
 
                 <Col xs={24} lg={8}>
+                    {/* KHÔNG CÓ NÚT "TIẾN HÀNH THANH TOÁN" VÌ isCartPage mặc định là false */}
                     <OrderSummary cartItems={cartItems} subtotal={finalSubtotal} shippingFee={shippingFee} discount={discount} setDiscount={setDiscount} />
                 </Col>
             </Row>

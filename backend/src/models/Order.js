@@ -34,7 +34,7 @@ const orderSchema = new mongoose.Schema({
     
     status: { 
         type: String, 
-        enum: ['waiting_approval', 'pending', 'paid', 'done', 'unsuccessful', 'cancelled'], 
+        enum: ['waiting_approval', 'pending', 'paid', 'shipping', 'done', 'unsuccessful', 'cancelled'], 
         default: 'waiting_approval' 
     }
 }, { timestamps: true });

@@ -5,8 +5,8 @@ import { CreditCardOutlined, BankOutlined, DollarOutlined } from '@ant-design/ic
 const { Title, Text } = Typography;
 
 const PaymentStep = ({ paymentMethod, setPaymentMethod }) => {
-    // Tạm thời dùng state nội bộ để quản lý việc hiển thị Form thẻ tín dụng
-    const [selectedMethod, setSelectedMethod] = useState(paymentMethod || 'credit_card');
+    // Nếu chưa có, mặc định là thanh toán khi nhận hàng (COD)
+    const [selectedMethod, setSelectedMethod] = useState(paymentMethod || 'cod');
 
     const handleChange = (e) => {
         setSelectedMethod(e.target.value);
@@ -16,22 +16,16 @@ const PaymentStep = ({ paymentMethod, setPaymentMethod }) => {
     return (
         <div style={{ background: '#161e2e', padding: '32px', borderRadius: '16px', border: '1px solid #30363d' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <Title level={4} style={{ color: '#fff', margin: 0 }}>💳 Payment Method</Title>
-                <Text style={{ color: '#2162ed', fontWeight: 'bold' }}>STEP 2/3</Text>
+                <Title level={4} style={{ color: '#fff', margin: 0 }}>💳 Phương thức thanh toán</Title>
+                <Text style={{ color: '#2162ed', fontWeight: 'bold' }}>BƯỚC 2/3</Text>
             </div>
 
             <style>
                 {`
                     .payment-radio-group { width: 100%; }
                     .payment-radio-wrapper {
-                        display: flex;
-                        align-items: center;
-                        padding: 16px;
-                        border: 1px solid #30363d;
-                        border-radius: 12px;
-                        margin-bottom: 16px;
-                        background: #0d1117;
-                        transition: all 0.3s;
+                        display: flex; align-items: center; padding: 16px; border: 1px solid #30363d;
+                        border-radius: 12px; margin-bottom: 16px; background: #0d1117; transition: all 0.3s;
                     }
                     .payment-radio-wrapper.active { border-color: #2162ed; background: rgba(33, 98, 237, 0.05); }
                     .payment-radio-group .ant-radio { margin-top: 2px; align-self: flex-start; }
@@ -50,32 +44,31 @@ const PaymentStep = ({ paymentMethod, setPaymentMethod }) => {
                     <Radio value="credit_card">
                         <div className="payment-content">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="payment-title">Credit or Debit Card</span>
+                                <span className="payment-title">Thẻ Tín dụng / Ghi nợ</span>
                                 <Space>
                                     <div style={{ background: '#fff', padding: '2px 4px', borderRadius: '4px' }}><Text strong style={{ color: '#1a1f36', fontSize: '10px' }}>VISA</Text></div>
                                     <div style={{ background: '#ff5f00', padding: '2px 4px', borderRadius: '4px' }}><Text strong style={{ color: '#fff', fontSize: '10px' }}>MC</Text></div>
                                 </Space>
                             </div>
-                            <span className="payment-desc">Secure encrypted transaction</span>
+                            <span className="payment-desc">Giao dịch được mã hóa bảo mật</span>
                             
-                            {/* KHUNG NHẬP THẺ (DUMMY UI) */}
                             {selectedMethod === 'credit_card' && (
                                 <div style={{ marginTop: '20px' }}>
                                     <Form layout="vertical" className="dark-checkout-form">
-                                        <Form.Item label="Name on Card">
-                                            <Input placeholder="Alex Chen" size="large" />
+                                        <Form.Item label="Tên in trên thẻ">
+                                            <Input placeholder="NGUYEN VAN A" size="large" />
                                         </Form.Item>
-                                        <Form.Item label="Card Number">
+                                        <Form.Item label="Số thẻ">
                                             <Input placeholder="0000 0000 0000 0000" size="large" prefix={<CreditCardOutlined style={{ color: '#8b949e' }} />} />
                                         </Form.Item>
                                         <Row gutter={16}>
                                             <Col span={12}>
-                                                <Form.Item label="Expiry Date">
+                                                <Form.Item label="Ngày hết hạn">
                                                     <Input placeholder="MM/YY" size="large" />
                                                 </Form.Item>
                                             </Col>
                                             <Col span={12}>
-                                                <Form.Item label="CVV">
+                                                <Form.Item label="Mã bảo mật (CVV)">
                                                     <Input placeholder="123" size="large" type="password" />
                                                 </Form.Item>
                                             </Col>
@@ -92,10 +85,10 @@ const PaymentStep = ({ paymentMethod, setPaymentMethod }) => {
                     <Radio value="bank_transfer">
                         <div className="payment-content">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="payment-title">Bank Transfer</span>
+                                <span className="payment-title">Chuyển khoản Ngân hàng</span>
                                 <BankOutlined style={{ fontSize: '20px', color: '#8b949e' }} />
                             </div>
-                            <span className="payment-desc">Direct wire to our corporate account</span>
+                            <span className="payment-desc">Chuyển tiền trực tiếp vào tài khoản công ty của chúng tôi</span>
                         </div>
                     </Radio>
                 </div>
@@ -105,10 +98,10 @@ const PaymentStep = ({ paymentMethod, setPaymentMethod }) => {
                     <Radio value="cod">
                         <div className="payment-content">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="payment-title">Cash on Delivery</span>
+                                <span className="payment-title">Thanh toán khi nhận hàng (COD)</span>
                                 <DollarOutlined style={{ fontSize: '20px', color: '#8b949e' }} />
                             </div>
-                            <span className="payment-desc">Pay when you receive your order</span>
+                            <span className="payment-desc">Thanh toán bằng tiền mặt khi đơn hàng được giao đến tay bạn</span>
                         </div>
                     </Radio>
                 </div>
